@@ -5,6 +5,7 @@ This repository contains a clean, modular implementation of the Proximal Policy 
 This implementation has been written with a strong focus on readability and educational value, as well as performance. The code is thoroughly commented and structured to be easily understood, making it an excellent resource for those learning about PPO or looking to use this implementation a reference architecture for their own projects.
 
 ## Project Structure
+The `simple_ppo` folder contains:
 - `agent.py`: Contains examples of neural network architectures for the policy and value function, along with the interface (ABC) for the PPO implementation
 - `ppo.py`: Contains the core PPO implementation
 - `main.py`: Example script demonstrating how to use the PPO implementation
