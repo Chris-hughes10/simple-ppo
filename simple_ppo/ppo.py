@@ -231,7 +231,6 @@ class PPO:
                 is_next_observation_terminal,
             ) = self.collect_rollouts(next_observation, is_next_observation_terminal)
 
-            # Update policy
             update_results = self.update_policy(
                 batch_observations,
                 batch_log_probabilities,
