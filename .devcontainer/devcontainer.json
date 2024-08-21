@@ -1,0 +1,36 @@
+// File only needed for VSCode users to have proper Docker based interpreters
+{
+    "name": "simple_ppo",
+    "build": {
+         "dockerfile": "../environment/Dockerfile"
+    },
+    "runArgs": [
+        // ACTION NEEDED: uncomment the next line if your local machine has GPUs available
+        "--gpus", "all",
+        // Enable the docker container to access system resources
+        "--ipc", "host"
+
+    ],
+    "remoteEnv": {
+        "PYTHONPATH": "${containerEnv:PATH}:${containerWorkspaceFolder}/simple_ppo:$",
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                // Ensure we have IntelliSense in VSCode when running inside container
+                "EditorConfig.EditorConfig",
+                "ms-python.python",
+                "GitHub.copilot",
+                "blackCodeFormatter.black",
+                "ms-toolsai.jupyter",
+                "redhat.vscode-yaml",
+                "charliermarsh.ruff"
+            ]
+        }
+    },
+    "workspaceFolder": "/workspaces/simple-ppo",
+    // Need git for VSCode to color code modifications. Only runs when building environment.
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {"version": "latest"}
+    }
+}
