@@ -143,6 +143,24 @@ class PPO:
         The PPO algorithm works by collecting a batch of data from the environment,
         then performing multiple epochs of optimization on this data. It uses a surrogate
         objective function and a value function, both clipped to prevent too large policy updates.
+
+        KL Divergence Approach:
+        This implementation uses a fixed KL divergence threshold (`target_kl`) for early stopping.
+        If `target_kl` is set (not None), the policy update will stop early if the approximate
+        KL divergence exceeds this threshold. This acts as a safeguard against too large policy
+        updates, helping to maintain the trust region.
+
+        - If `target_kl` is None, no early stopping based on KL divergence is performed.
+        - A smaller `target_kl` (e.g., 0.01) results in more conservative updates, potentially
+          leading to more stable but slower learning.
+        - A larger `target_kl` (e.g., 0.05) allows for larger policy updates, potentially
+          leading to faster but possibly less stable learning.
+        - Common values for `target_kl` range between 0.01 and 0.05. The original paper (https://arxiv.org/abs/1707.06347)
+          settled on a target range of (0.003 to 0.03)
+
+        The optimal `target_kl` can depend on the specific environment and problem. It's often
+        beneficial to monitor the KL divergence during training and adjust `target_kl` based on
+        the stability and speed of learning.
         """
         self.agent = agent
         self.envs = envs
