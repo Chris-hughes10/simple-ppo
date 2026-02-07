@@ -165,10 +165,8 @@ class ContinuousAgent(BaseAgent):
         if self.rpo_alpha is not None:
             # sample again to add stochasticity to the policy
             action_mean = action_dist.mean
-            z = (
-                torch.FloatTensor(action_mean.shape)
-                .uniform_(-self.rpo_alpha, self.rpo_alpha)
-                .to(self.actor_logstd.device)
+            z = torch.zeros_like(action_mean).uniform_(
+                -self.rpo_alpha, self.rpo_alpha
             )
             action_mean = action_mean + z
             action_dist = Normal(action_mean, action_dist.stddev)

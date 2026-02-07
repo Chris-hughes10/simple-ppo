@@ -63,10 +63,14 @@ class PPOLogger:
             )
 
             self.writer.add_scalar(
-                "losses/kl_divergence", update_results["old_approx_kl"], global_step
+                "losses/old_approx_kl_divergence",
+                update_results["old_approx_kl"],
+                global_step,
             )
             self.writer.add_scalar(
-                "losses/kl_divergence", update_results["approx_kl"], global_step
+                "losses/approx_kl_divergence",
+                update_results["approx_kl"],
+                global_step,
             )
             self.writer.add_scalar(
                 "losses/clipping_fraction",
@@ -86,9 +90,7 @@ class PPO:
         agent,
         optimizer,
         envs,
-        learning_rate=3e-4,
         num_rollout_steps=2048,
-        num_envs=1,
         gamma=0.99,
         gae_lambda=0.95,
         surrogate_clip_threshold=0.2,
@@ -116,9 +118,7 @@ class PPO:
             envs: The vectorized environment(s) to train on.
 
             # Core PPO parameters
-            learning_rate (float): Learning rate for the optimizer.
             num_rollout_steps (int): Number of steps to run for each environment per update.
-            num_envs (int): Number of parallel environments.
             gamma (float): Discount factor for future rewards.
             gae_lambda (float): Lambda parameter for Generalized Advantage Estimation.
             surrogate_clip_threshold (float): Clipping parameter for the surrogate objective.
@@ -168,8 +168,8 @@ class PPO:
         self.seed = seed
 
         self.num_rollout_steps = num_rollout_steps
-        self.num_envs = num_envs
-        self.batch_size = num_envs * num_rollout_steps
+        self.num_envs = envs.num_envs
+        self.batch_size = self.num_envs * num_rollout_steps
         self.num_minibatches = num_minibatches
         self.minibatch_size = self.batch_size // num_minibatches
 
@@ -187,7 +187,7 @@ class PPO:
         self.device = next(agent.parameters()).device
 
         self.anneal_lr = anneal_lr
-        self.initial_lr = learning_rate
+        self.initial_lr = optimizer.param_groups[0]["lr"]
 
         self.lr_scheduler = None
         self._global_step = 0
@@ -235,9 +235,6 @@ class PPO:
         self._global_step = 0
 
         for update in range(num_policy_updates):
-            if self.anneal_lr:
-                self.lr_scheduler.step()
-
             (
                 batch_observations,
                 batch_log_probabilities,
@@ -259,6 +256,9 @@ class PPO:
             )
 
             self.logger.log_policy_update(update_results, self._global_step)
+
+            if self.anneal_lr:
+                self.lr_scheduler.step()
 
         print(f"Training completed. Total steps: {self._global_step}")
 
@@ -353,17 +353,16 @@ class PPO:
             )
             self._global_step += self.num_envs
             rewards[step] = torch.as_tensor(reward, device=self.device).view(-1)
-            is_next_observation_terminal = np.logical_or(terminations, truncations)
 
-            next_observation, is_next_observation_terminal = (
-                torch.as_tensor(
-                    next_observation, dtype=torch.float32, device=self.device
-                ),
-                torch.as_tensor(
-                    is_next_observation_terminal,
-                    dtype=torch.float32,
-                    device=self.device,
-                ),
+            # Track only true terminations for GAE bootstrapping.
+            # Truncated episodes (e.g. time limits) should still bootstrap
+            # the value of the next state, since the episode didn't truly end.
+            is_next_observation_terminal = torch.as_tensor(
+                terminations, dtype=torch.float32, device=self.device
+            )
+
+            next_observation = torch.as_tensor(
+                next_observation, dtype=torch.float32, device=self.device
             )
 
             self.logger.log_rollout_step(infos, self._global_step)

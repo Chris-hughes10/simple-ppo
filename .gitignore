@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Training artifacts
+runs/
+videos/
+
+# Environment
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
