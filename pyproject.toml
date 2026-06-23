@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "simple-ppo"
+version = "0.1.0"
+description = "A clean, modular implementation of the Proximal Policy Optimization algorithm using PyTorch"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.4",
+    "numpy",
+    "gymnasium==0.29.1",
+    "func-to-script==0.1.0",
+    "tensorboard>=2.17",
+]
+
+[project.optional-dependencies]
+mujoco = [
+    "mujoco>=3.2",
+]
+video = [
+    "moviepy>=1.0",
+    "pygame>=2.6",
+]
+dev = [
+    "torch-tb-profiler>=0.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["simple_ppo*"]

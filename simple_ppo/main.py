@@ -55,21 +55,17 @@ def make_continuous_env(env_id, idx, capture_video, run_name, gamma):
     return create_configured_env
 
 
-def get_NormalizeObservation_wrapper(self, env_num=0):
-    return self.gym_sync_vec_env.envs[env_num].env.env.env
-
-
-def get_obs_norm_rms_obj(self, env_num=0):
-    return self.get_NormalizeObservation_wrapper(env_num=env_num).obs_rms
-
-
-def set_obs_norm_rms_obj(self, rms_obj, env_num=0):
-    self.get_NormalizeObservation_wrapper(env_num=env_num).obs_rms = rms_obj
-
-
-def get_obs_norm_rms_vars(self, env_num=0):
-    rms_obj = self.get_obs_norm_rms_obj(env_num)
-    return rms_obj.mean, rms_obj.var, rms_obj.count
+def _get_normalize_obs_wrapper(envs, env_num=0):
+    """Walk the wrapper chain of a SyncVectorEnv sub-environment to find
+    the NormalizeObservation wrapper and return it."""
+    env = envs.envs[env_num]
+    while env is not None:
+        if isinstance(env, gym.wrappers.NormalizeObservation):
+            return env
+        env = getattr(env, "env", None)
+    raise RuntimeError(
+        f"NormalizeObservation wrapper not found in env {env_num}"
+    )
 
 
 def create_envs(env_id, num_envs, env_is_discrete, capture_video, run_name, gamma):
@@ -121,11 +117,21 @@ def load_and_evaluate_model(
     )
 
     if not env_is_discrete:
-        # Update normalization stats for continuous environments
-        avg_rms_obj = (
-            np.mean([envs.get_obs_norm_rms_obj(i) for i in range(num_envs)]) / num_envs
+        # Transfer normalization stats from training envs to eval env.
+        # Average the running mean/var across all training envs.
+        train_rms_objects = [
+            _get_normalize_obs_wrapper(envs, i).obs_rms for i in range(num_envs)
+        ]
+        eval_obs_wrapper = _get_normalize_obs_wrapper(eval_envs, 0)
+        eval_obs_wrapper.obs_rms.mean = np.mean(
+            [rms.mean for rms in train_rms_objects], axis=0
         )
-        eval_envs.set_obs_norm_rms_obj(avg_rms_obj)
+        eval_obs_wrapper.obs_rms.var = np.mean(
+            [rms.var for rms in train_rms_objects], axis=0
+        )
+        eval_obs_wrapper.obs_rms.count = sum(
+            rms.count for rms in train_rms_objects
+        )
 
     eval_agent = agent_class(eval_envs).to(device)
     eval_agent.load_state_dict(torch.load(model_path, map_location=device))
@@ -258,9 +264,8 @@ def run_ppo(
     ppo = PPO(
         agent=agent,
         optimizer=optimizer,
-        learning_rate=learning_rate,
+        envs=envs,
         num_rollout_steps=num_rollout_steps,
-        num_envs=num_envs,
         gamma=gamma,
         gae_lambda=gae_lambda,
         surrogate_clip_threshold=surrogate_clip_threshold,
@@ -273,7 +278,6 @@ def run_ppo(
         clip_value_function_loss=clip_value_function_loss,
         target_kl=target_kl,
         anneal_lr=anneal_lr,
-        envs=envs,
         seed=seed,
         logger=PPOLogger(run_name, use_tensorboard),
     )
@@ -283,6 +287,7 @@ def run_ppo(
 
     if save_model:
         model_path = f"runs/{run_name}/{exp_name}.rl_model"
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
         torch.save(trained_agent.state_dict(), model_path)
         print(f"Model saved to {model_path}")
 
